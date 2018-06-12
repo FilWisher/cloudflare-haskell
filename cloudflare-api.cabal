@@ -16,11 +16,10 @@ extra-source-files:  ChangeLog.md
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Cloudflare
-                       Cloudflare.Zones
-                       Cloudflare.DNS
-  other-modules:       Cloudflare.Internals
-  pkgconfig-depends:   zlib
+  exposed-modules:     Web.Cloudflare
+                       Web.Cloudflare.Zones
+                       Web.Cloudflare.DNS
+  other-modules:       Web.Cloudflare.Internals
   build-depends:       base >=4.10 && <4.11
                      , mtl
                      , text

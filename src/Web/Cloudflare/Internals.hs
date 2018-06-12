@@ -1,14 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Cloudflare.Internals where
+module Web.Cloudflare.Internals where
 
 import GHC.Generics
 
 import Control.Monad.Reader
-import Control.Monad.Except
-import Control.Monad.Trans
 
 import Data.Monoid ((<>))
 
@@ -43,14 +40,14 @@ data APIResponse a = APIResponse
 
 instance FromJSON a => FromJSON (APIResponse a)
 
-type CloudflareAPI m a = ReaderT Account (ExceptT APIError m) a
+type Cloudflare a = ReaderT Account IO a
 
-runCloudflareAPI :: CloudflareAPI m a -> Account -> m (Either APIError a)
-runCloudflareAPI acc = runExceptT . runReaderT acc
+runCloudflare :: Cloudflare a -> Account -> IO a
+runCloudflare = runReaderT
 
-getCloudflare :: (MonadIO m, FromJSON a) => Path -> CloudflareAPI m a
+getCloudflare :: FromJSON a => Path -> Cloudflare a
 getCloudflare path = ReaderT $ \acc -> do
-    r <- liftIO $ asJSON =<< getWith (opts acc) (baseurl <> path)
+    r <- asJSON =<< getWith (opts acc) (baseurl <> path)
     return (result $ r ^. responseBody)
     where
         opts (Account email apikey) = defaults
@@ -58,19 +55,12 @@ getCloudflare path = ReaderT $ \acc -> do
             & header "X-Auth-Key"   .~ [apikey]
             & header "Content-Type" .~ ["application/json"]
 
-postCloudflare :: (MonadIO m, ToJSON a, FromJSON b) => Path -> a -> CloudflareAPI m b
+postCloudflare :: (ToJSON a, FromJSON b) => Path -> a -> Cloudflare b
 postCloudflare path body = ReaderT $ \acc -> do
-    r <- liftIO $ asJSON =<< postWith (opts acc) (baseurl <> path) (toJSON body)
+    r <- asJSON =<< postWith (opts acc) (baseurl <> path) (toJSON body)
     return (result $ r ^. responseBody)
     where
         opts (Account email apikey) = defaults
             & header "X-Auth-Email" .~ [email]
             & header "X-Auth-Key"   .~ [apikey]
             & header "Content-Type" .~ ["application/json"]
-
-data APIError
-    = NotFound T.Text
-    | NetworkError T.Text -- ^ Returned by the client
-    | HTTPError T.Text -- ^ Returned by the API because of bad HTTP
-    | CloudflareError T.Text -- ^ Returned by the API
-    deriving (Show)

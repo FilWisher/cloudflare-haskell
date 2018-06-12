@@ -1,9 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
 
-module Cloudflare.DNS where
+module Web.Cloudflare.DNS where
 
-import Control.Monad.Trans
 import Control.Monad.Except
 
 import Data.Monoid ((<>))
@@ -13,8 +12,8 @@ import Data.Aeson.Types
 import GHC.Generics
 import qualified Data.Text as T
 
-import Cloudflare.Internals
-import Cloudflare.Zones
+import Web.Cloudflare.Internals
+import Web.Cloudflare.Zones
 
 data DNSRecord = DNSRecord
     { dnsId      :: Maybe T.Text
@@ -36,9 +35,8 @@ instance ToJSON DNSRecord where
         }
 
 
-listDNSRecords :: MonadIO m => ZoneID -> CloudflareAPI m [DNSRecord]
+listDNSRecords :: ZoneID -> Cloudflare [DNSRecord]
 listDNSRecords zid = getCloudflare ("/zones/" <> T.unpack zid <> "/dns_records")
 
-createDNSRecord :: MonadIO m => ZoneID -> DNSRecord -> CloudflareAPI m DNSRecord
-createDNSRecord zid record =
-    postCloudflare ("/zones/" <> T.unpack zid <> "/dns_records") record
+createDNSRecord :: ZoneID -> DNSRecord -> Cloudflare DNSRecord
+createDNSRecord zid = postCloudflare ("/zones/" <> T.unpack zid <> "/dns_records")
