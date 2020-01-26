@@ -20,7 +20,7 @@ library
                        Web.Cloudflare.Zones
                        Web.Cloudflare.DNS
   other-modules:       Web.Cloudflare.Internals
-  build-depends:       base >=4.10 && <4.11
+  build-depends:       base >=4.10 && <4.13
                      , mtl
                      , text
                      , bytestring

@@ -14,7 +14,7 @@ import qualified Data.ByteString as BS
 
 import Control.Lens
 import Data.Aeson
-import Network.Wreq
+import Network.Wreq hiding (Auth)
 
 type Email = BS.ByteString
 type APIKey = BS.ByteString
@@ -38,52 +38,42 @@ data APIResponse a = APIResponse
     }
     deriving (Show, Generic)
 
+data Auth = TokenAuth BS.ByteString | AccountAuth Account
+
 instance FromJSON a => FromJSON (APIResponse a)
 
-type Cloudflare a = ReaderT Account IO a
+type Cloudflare a = ReaderT Auth IO a
 
-runCloudflare :: Account -> Cloudflare a -> IO a
+runCloudflare :: Auth -> Cloudflare a -> IO a
 runCloudflare = flip runReaderT
 
 getCloudflare :: FromJSON a => Path -> Cloudflare a
-getCloudflare path = ReaderT $ \acc -> do
-    r <- asJSON =<< getWith (opts acc) (T.unpack $ baseurl </> path)
+getCloudflare path = ReaderT $ \auth -> do
+    r <- asJSON =<< getWith (doAuth auth) (T.unpack $ baseurl </> path)
     return (result $ r ^. responseBody)
-    where
-        opts (Account email apikey) = defaults
-            & header "X-Auth-Email" .~ [email]
-            & header "X-Auth-Key"   .~ [apikey]
-            & header "Content-Type" .~ ["application/json"]
+
+doAuth :: Auth -> Network.Wreq.Options
+doAuth (AccountAuth (Account email apikey)) = 
+    defaults & header "X-Auth-Email" .~ [email]
+             & header "X-Auth-Key"   .~ [apikey]
+             & header "Content-Type" .~ ["application/json"]
+doAuth (TokenAuth token) =
+    defaults & header "Authorization" .~ ["Bearer " <> token]
 
 postCloudflare :: (ToJSON a, FromJSON b) => Path -> a -> Cloudflare b
-postCloudflare path body = ReaderT $ \acc -> do
-    r <- asJSON =<< postWith (opts acc) (T.unpack $ baseurl </> path) (toJSON body)
+postCloudflare path body = ReaderT $ \auth -> do
+    r <- asJSON =<< postWith (doAuth auth) (T.unpack $ baseurl </> path) (toJSON body)
     return (result $ r ^. responseBody)
-    where
-        opts (Account email apikey) = defaults
-            & header "X-Auth-Email" .~ [email]
-            & header "X-Auth-Key"   .~ [apikey]
-            & header "Content-Type" .~ ["application/json"]
 
 putCloudflare :: (ToJSON a, FromJSON b) => Path -> a -> Cloudflare b
-putCloudflare path body = ReaderT $ \acc -> do
-    r <- asJSON =<< putWith (opts acc) (T.unpack $ baseurl </> path) (toJSON body)
+putCloudflare path body = ReaderT $ \auth -> do
+    r <- asJSON =<< putWith (doAuth auth) (T.unpack $ baseurl </> path) (toJSON body)
     return (result $ r ^. responseBody)
-    where
-        opts (Account email apikey) = defaults
-            & header "X-Auth-Email" .~ [email]
-            & header "X-Auth-Key"   .~ [apikey]
-            & header "Content-Type" .~ ["application/json"]
 
 deleteCloudflare :: Path -> Cloudflare ()
-deleteCloudflare path = ReaderT $ \acc -> do
-    deleteWith (opts acc) (T.unpack $ baseurl </> path)
+deleteCloudflare path = ReaderT $ \auth -> do
+    deleteWith (doAuth auth) (T.unpack $ baseurl </> path)
     return ()
-    where
-        opts (Account email apikey) = defaults
-            & header "X-Auth-Email" .~ [email]
-            & header "X-Auth-Key"   .~ [apikey]
-            & header "Content-Type" .~ ["application/json"]
 
 (</>) :: T.Text -> T.Text -> T.Text
 (</>) bef aft = bef <> "/" <> aft
