@@ -22,6 +22,7 @@ data DNSRecordPatch = DNSRecordPatch
     , dnsPatchName    :: T.Text
     , dnsPatchContent :: T.Text
     , dnsPatchTTL     :: Int
+    , dnsPatchProxied :: Bool
     }
     deriving (Show, Generic)
 
@@ -31,6 +32,12 @@ data DNSRecord = DNSRecord
     , dnsName    :: T.Text
     , dnsContent :: T.Text
     , dnsTTL     :: Int
+    , dnsProxied :: Bool
+    }
+    deriving (Show, Generic)
+
+data DNSListFilter = DNSListFilter
+    { dnsListName :: Maybe T.Text
     }
     deriving (Show, Generic)
 
@@ -50,9 +57,19 @@ instance ToJSON DNSRecord where
     toJSON = genericToJSON defaultOptions
         { fieldLabelModifier = camelTo2 '_' . drop 3 }
 
+emptyDNSListFilter :: DNSListFilter
+emptyDNSListFilter = DNSListFilter
+  { dnsListName = Nothing
+  }
 
-listDNSRecords :: ZoneID -> Cloudflare [DNSRecord]
-listDNSRecords zid = getCloudflare ("zones" </> zid </> "dns_records")
+listDNSRecords :: ZoneID -> DNSListFilter -> Cloudflare [DNSRecord]
+listDNSRecords zid dnslistfilter = getCloudflare ("zones" </> zid </> "dns_records" <> query)
+  where
+      -- TODO: use a library for query params
+      query = "?" <> nameParam
+      nameParam = case dnsListName dnslistfilter of
+        Nothing -> ""
+        Just name -> "name=" <> name
 
 createDNSRecord :: ZoneID -> DNSRecordPatch -> Cloudflare DNSRecord
 createDNSRecord zid = postCloudflare ("zones" </> zid </> "dns_records")
